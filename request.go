@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/aynakeya/deepcolor/dphttp"
 	"github.com/spf13/cast"
+	"net/http"
 )
 
 func NewGetRequestFuncWithSingleQuery(
@@ -15,7 +16,7 @@ func NewGetRequestFuncWithSingleQuery(
 		paramVals.Set(query, param)
 		url.RawQuery = paramVals.Encode()
 		return &dphttp.Request{
-			Method: dphttp.GET,
+			Method: http.MethodGet,
 			Url:    url,
 			Header: headers,
 		}, nil
@@ -36,7 +37,7 @@ func NewGetRequestFuncWithQuery(
 		}
 		url.RawQuery = paramVals.Encode()
 		return &dphttp.Request{
-			Method: dphttp.GET,
+			Method: http.MethodGet,
 			Url:    url,
 			Header: headers,
 		}, nil
@@ -48,7 +49,7 @@ func NewGetRequestFromUrl(
 	headers map[string]string,
 	params ...any) *dphttp.Request {
 	return &dphttp.Request{
-		Method: dphttp.GET,
+		Method: http.MethodGet,
 		Url:    dphttp.UrlMustParse(fmt.Sprintf(uri, params...)),
 		Header: headers,
 	}
@@ -62,7 +63,7 @@ func NewGetRequestWithSingleQuery(
 	paramVals.Set(query, value)
 	url.RawQuery = paramVals.Encode()
 	return &dphttp.Request{
-		Method: dphttp.GET,
+		Method: http.MethodGet,
 		Url:    url,
 		Header: headers,
 	}, nil
@@ -78,7 +79,7 @@ func NewGetRequestWithQuery(
 	}
 	url.RawQuery = paramVals.Encode()
 	return &dphttp.Request{
-		Method: dphttp.GET,
+		Method: http.MethodGet,
 		Url:    url,
 		Header: headers,
 	}, nil

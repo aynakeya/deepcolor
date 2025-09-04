@@ -8,4 +8,5 @@ func init() {
 	registry = make(map[string]IValueGetterCtor)
 	registry["json"] = NewJsonValueGetter
 	registry["regex"] = NewRegexpValueGetter
+	registry["xml"] = NewXmlValueGetter
 }

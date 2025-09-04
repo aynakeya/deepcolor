@@ -13,3 +13,9 @@ type Request struct {
 	Timeout int               `json:"timeout"`
 	Context context.Context   `json:"-"`
 }
+
+// todo
+func (r *Request) SetCookie(key string, value string) {
+}
+func (r *Request) SetCookies(map[string]string) {
+}
