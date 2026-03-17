@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/antchfx/xmlquery"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 )
@@ -73,6 +74,73 @@ func registerBuiltins(r *Registry) {
 			return nil, nil
 		}
 		return m[group], nil
+	})
+	r.RegisterExtractor("regex_all", func(_ *Context, st *State, arg string) (any, error) {
+		parts := strings.SplitN(arg, "=>", 2)
+		if len(parts) == 0 || parts[0] == "" {
+			return nil, &Error{Kind: ErrKindRuntime, Op: "regex_all", Message: "regex arg required"}
+		}
+		group := 0
+		if len(parts) == 2 {
+			g, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return nil, err
+			}
+			group = g
+		}
+		re, err := regexp.Compile(parts[0])
+		if err != nil {
+			return nil, err
+		}
+		var raw string
+		switch v := st.Input.(type) {
+		case string:
+			raw = v
+		case []byte:
+			raw = string(v)
+		default:
+			return nil, &Error{Kind: ErrKindRuntime, Op: "regex_all", Message: "regex_all extractor requires string/[]byte input"}
+		}
+		matches := re.FindAllStringSubmatch(raw, -1)
+		if len(matches) == 0 {
+			return []any{}, nil
+		}
+		out := make([]any, 0, len(matches))
+		for _, m := range matches {
+			if len(m) <= group {
+				continue
+			}
+			out = append(out, m[group])
+		}
+		return out, nil
+	})
+	r.RegisterExtractor("xml", func(_ *Context, st *State, arg string) (any, error) {
+		doc, err := parseXMLInput(st.Input)
+		if err != nil {
+			return nil, err
+		}
+		expr := applyXMLIndexPlaceholder(arg, st.Scope)
+		node := xmlquery.FindOne(doc, expr)
+		if node == nil {
+			return nil, nil
+		}
+		return node.InnerText(), nil
+	})
+	r.RegisterExtractor("xml_all", func(_ *Context, st *State, arg string) (any, error) {
+		doc, err := parseXMLInput(st.Input)
+		if err != nil {
+			return nil, err
+		}
+		expr := applyXMLIndexPlaceholder(arg, st.Scope)
+		nodes := xmlquery.Find(doc, expr)
+		if len(nodes) == 0 {
+			return []any{}, nil
+		}
+		out := make([]any, 0, len(nodes))
+		for _, n := range nodes {
+			out = append(out, n.InnerText())
+		}
+		return out, nil
 	})
 
 	r.RegisterMapper("cast_string", EffectPure, func(_ *Context, in any, _ []any) (any, error) { return cast.ToString(in), nil })
@@ -234,4 +302,30 @@ func parseOpCandidate(v any) (OpSpec, error) {
 	default:
 		return OpSpec{}, &Error{Kind: ErrKindRuntime, Op: "switch_first", Message: "unsupported candidate type"}
 	}
+}
+
+func parseXMLInput(input any) (*xmlquery.Node, error) {
+	switch v := input.(type) {
+	case string:
+		return xmlquery.Parse(strings.NewReader(v))
+	case []byte:
+		return xmlquery.Parse(strings.NewReader(string(v)))
+	default:
+		return nil, &Error{Kind: ErrKindRuntime, Op: "xml", Message: "xml extractor requires string/[]byte input"}
+	}
+}
+
+func applyXMLIndexPlaceholder(expr string, scope map[string]any) string {
+	if !strings.Contains(expr, "#") {
+		return expr
+	}
+	if scope == nil {
+		return expr
+	}
+	rawIdx, ok := scope["$index"]
+	if !ok {
+		return expr
+	}
+	idx := cast.ToInt(rawIdx) + 1
+	return strings.ReplaceAll(expr, "#", strconv.Itoa(idx))
 }
