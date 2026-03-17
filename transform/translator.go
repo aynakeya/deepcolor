@@ -1,7 +1,7 @@
 package transform
 
 import (
-	"github.com/aynakeya/deepcolor/common/dynmarshaller"
+	"github.com/aynakeya/deepcolor/internal/dynmarshaller"
 	"reflect"
 )
 

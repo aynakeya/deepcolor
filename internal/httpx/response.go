@@ -1,4 +1,4 @@
-package dphttp
+package httpx
 
 import (
 	"net/http"

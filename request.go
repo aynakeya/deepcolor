@@ -1,86 +1,87 @@
 package deepcolor
 
 import (
-	"fmt"
-	"github.com/aynakeya/deepcolor/dphttp"
-	"github.com/spf13/cast"
-	"net/http"
+	"context"
+	"time"
 )
 
-func NewGetRequestFuncWithSingleQuery(
-	uri string,
-	query string, headers map[string]string) dphttp.RequestFunc[string] {
-	return func(param string) (*dphttp.Request, error) {
-		url := dphttp.UrlMustParse(uri)
-		paramVals := url.Query()
-		paramVals.Set(query, param)
-		url.RawQuery = paramVals.Encode()
-		return &dphttp.Request{
-			Method: http.MethodGet,
-			Url:    url,
-			Header: headers,
-		}, nil
+type Request struct {
+	Method  string
+	URL     string
+	Query   map[string]any
+	Header  map[string]string
+	Body    any
+	Timeout time.Duration
+	Context context.Context
+}
+
+func NewRequest(method string, rawURL string) *Request {
+	return &Request{
+		Method: method,
+		URL:    rawURL,
+		Query:  make(map[string]any),
+		Header: make(map[string]string),
 	}
 }
 
-func NewGetRequestFuncWithQuery(
-	uri string,
-	queries []string, headers map[string]string) dphttp.RequestFunc[[]string] {
-	return func(params []string) (*dphttp.Request, error) {
-		if len(queries) > len(params) {
-			return nil, fmt.Errorf("only receive %d parameter, required %d", len(params), len(queries))
-		}
-		url := dphttp.UrlMustParse(uri)
-		paramVals := url.Query()
-		for i, _ := range queries {
-			paramVals.Set(queries[i], params[i])
-		}
-		url.RawQuery = paramVals.Encode()
-		return &dphttp.Request{
-			Method: http.MethodGet,
-			Url:    url,
-			Header: headers,
-		}, nil
+func (r *Request) Clone() *Request {
+	if r == nil {
+		return nil
 	}
+	cp := &Request{
+		Method:  r.Method,
+		URL:     r.URL,
+		Body:    r.Body,
+		Timeout: r.Timeout,
+		Context: r.Context,
+		Query:   make(map[string]any, len(r.Query)),
+		Header:  make(map[string]string, len(r.Header)),
+	}
+	for k, v := range r.Query {
+		cp.Query[k] = v
+	}
+	for k, v := range r.Header {
+		cp.Header[k] = v
+	}
+	return cp
 }
 
-func NewGetRequestFromUrl(
-	uri string,
-	headers map[string]string,
-	params ...any) *dphttp.Request {
-	return &dphttp.Request{
-		Method: http.MethodGet,
-		Url:    dphttp.UrlMustParse(fmt.Sprintf(uri, params...)),
-		Header: headers,
+func (r *Request) SetQuery(query map[string]any) *Request {
+	if r.Query == nil {
+		r.Query = make(map[string]any)
 	}
+	for k, v := range query {
+		r.Query[k] = v
+	}
+	return r
 }
 
-func NewGetRequestWithSingleQuery(
-	uri string,
-	query, value string, headers map[string]string) (*dphttp.Request, error) {
-	url := dphttp.UrlMustParse(uri)
-	paramVals := url.Query()
-	paramVals.Set(query, value)
-	url.RawQuery = paramVals.Encode()
-	return &dphttp.Request{
-		Method: http.MethodGet,
-		Url:    url,
-		Header: headers,
-	}, nil
+func (r *Request) SetHeader(header map[string]string) *Request {
+	if r.Header == nil {
+		r.Header = make(map[string]string)
+	}
+	for k, v := range header {
+		r.Header[k] = v
+	}
+	return r
 }
 
-func NewGetRequestWithQuery(
-	uri string,
-	queries map[string]any, headers map[string]string) (*dphttp.Request, error) {
-	url := dphttp.UrlMustParse(uri)
-	paramVals := url.Query()
-	for key, value := range queries {
-		paramVals.Set(key, cast.ToString(value))
-	}
-	url.RawQuery = paramVals.Encode()
-	return &dphttp.Request{
-		Method: http.MethodGet,
-		Url:    url,
-		Header: headers,
-	}, nil
+func (r *Request) SetBody(body any) *Request {
+	r.Body = body
+	return r
+}
+
+func (r *Request) SetTimeout(seconds int) *Request {
+	r.Timeout = time.Duration(seconds) * time.Second
+	return r
+}
+
+func (r *Request) SetTimeoutDuration(timeout time.Duration) *Request {
+	r.Timeout = timeout
+	return r
+}
+
+func (r *Request) SetContext(ctx context.Context) *Request {
+	r.Context = ctx
+	return r
 }

@@ -1,4 +1,4 @@
-package dphttp
+package httpx
 
 type ParameterType any
 type RequestFunc[P ParameterType] func(params P) (*Request, error)
@@ -23,7 +23,7 @@ func (api *ApiInfo[P, T, R]) Run(requester IRequester, para P, result R) error {
 		if err != nil {
 			return err
 		}
-		httpResp, err := requester.HTTP(req)
+		httpResp, err := requester.Do(req)
 		if err != nil {
 			return err
 		}

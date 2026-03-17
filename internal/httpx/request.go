@@ -1,8 +1,9 @@
-package dphttp
+package httpx
 
 import (
 	"context"
 	"net/url"
+	"time"
 )
 
 type Request struct {
@@ -10,7 +11,7 @@ type Request struct {
 	Url     *url.URL          `json:"url"`
 	Header  map[string]string `json:"header"`
 	Data    []byte            `json:"data"`
-	Timeout int               `json:"timeout"`
+	Timeout time.Duration     `json:"timeout"`
 	Context context.Context   `json:"-"`
 }
 
