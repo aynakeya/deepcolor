@@ -17,7 +17,7 @@ type CheckFunc func(*Response) error
 type DecodeFunc[T any] func(*Response, *T) error
 
 type Flow[T any] struct {
-	req    *Request
+	req *Request
 
 	queryFns  []QueryFunc
 	headerFns []HeaderFunc

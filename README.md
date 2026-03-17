@@ -1,11 +1,9 @@
 # Deepcolor v2
 
-Deepcolor v2 is a lightweight HTTP workflow toolkit with two first-class styles:
+Deepcolor v2 provides two layers:
 
-- `Raw`: full manual control (`Client.Do(*Request)`)
-- `Flow`: chain style with generic output (`Flow[T]`)
-
-Template reuse is also unified into Flow through `Template[P,R]`.
+- `deepcolor` root package: lightweight HTTP request/flow API
+- `x/pipeline`: unified advanced data pipeline (`Extract -> Map -> Filter -> Project`)
 
 ## Install
 
@@ -13,82 +11,76 @@ Template reuse is also unified into Flow through `Template[P,R]`.
 go get github.com/aynakeya/deepcolor
 ```
 
-## Quick Start
+## Root HTTP Flow
 
 ```go
-dc := deepcolor.New(
-	deepcolor.WithHeader(map[string]string{"User-Agent": "deepcolor-v2"}),
-	deepcolor.WithTimeout(8),
-)
+dc := deepcolor.New(deepcolor.WithTimeout(8))
 
 resp, err := dc.GET("https://httpbin.org/get").
 	Query(map[string]any{"q": "hello"}).
 	JSON().
 	Response(dc)
-if err != nil {
-	// handle
-}
-_ = resp
-```
-
-## Typed Flow
-
-```go
-type Info struct {
-	Name string `json:"name"`
-}
-
-info, err := deepcolor.Typed[Info](
-	dc.GET("https://example.com/api/info"),
-).JSON().IntoJSON().Result(dc)
-_ = info
-_ = err
-```
-
-## Raw Style
-
-```go
-req := deepcolor.GET("https://example.com/api").
-	SetQuery(map[string]any{"id": 1}).
-	SetHeader(map[string]string{"X-Trace": "abc"})
-
-resp, err := dc.Do(req)
-if err != nil {
-	// handle
-}
-```
-
-## Reusable Flow Template
-
-```go
-infoFlow := deepcolor.Template(func(id string) *deepcolor.Flow[string] {
-	return deepcolor.Typed[string](
-		dc.GET("https://example.com/api/info"),
-	).Query(map[string]any{"id": id}).
-		Decode(func(resp *deepcolor.Response, out *string) error {
-			*out = resp.JSON("data.name").String()
-			return nil
-		})
-})
-
-name, err := infoFlow.Call(dc, "1001")
-_ = name
-_ = err
-```
-
-## Bind Then Run
-
-```go
-flow := infoFlow.Bind("1001")
-resp, err := flow.Response(dc)
 _ = resp
 _ = err
 ```
 
-## Notes
+## Unified Pipeline (`x/pipeline`)
 
-- v2 is a breaking redesign and does not preserve v1 root-level APIs.
-- Internal transport/runtime code is moved under `internal/` and is not public API.
-- Advanced processing modules are moved under `x/`:
-  - `github.com/aynakeya/deepcolor/x/formatter`
-  - `github.com/aynakeya/deepcolor/x/transform`
+```go
+reg := pipeline.NewRegistryWithBuiltins()
+
+plan := pipeline.Plan{
+	SchemaVersion: pipeline.VersionV1,
+	Source:        pipeline.SourceSpec{Name: "example"},
+	Steps: []pipeline.Step{
+		pipeline.ExtractStep{Assignments: []pipeline.ExtractAssignment{
+			{To: "title", Expr: "json:data.title"},
+			{To: "artist", Expr: "json:data.artist"},
+		}},
+		pipeline.MapStep{Transforms: []pipeline.MapTransform{
+			{Path: "title", Ops: []pipeline.OpSpec{{Name: "trim"}}},
+			{Path: "artist", Ops: []pipeline.OpSpec{{Name: "lower"}}},
+		}},
+		pipeline.FilterStep{
+			Mode: pipeline.FilterAll,
+			Conditions: []pipeline.Condition{
+				{Path: "title", Op: pipeline.OpSpec{Name: "exists"}},
+			},
+		},
+	},
+	Output: pipeline.ObjectNode{Fields: map[string]pipeline.Node{
+		"name":   pipeline.FieldNode{Path: "title"},
+		"artist": pipeline.FieldNode{Path: "artist"},
+	}},
+}
+
+if err := pipeline.ValidateSchema(plan, reg); err != nil {
+	panic(err)
+}
+
+compiled, err := pipeline.CompilePipeline(plan, reg)
+if err != nil {
+	panic(err)
+}
+
+out, err := compiled.WithExecutor(pipeline.Executor{
+	ErrorMode:        pipeline.ErrorModeFailFast,
+	AllowSideEffects: false,
+}).Run(pipeline.DefaultContext(), []byte(`{"data":{"title":"  Song ","artist":"REOL"}}`))
+_ = out
+_ = err
+```
+
+## Design Guarantees in `x/pipeline`
+
+- Typed schema nodes: `FieldNode` / `ArrayNode` / `ObjectNode` / `OpNode`
+- No global registry: use instance `Registry`
+- Unified error model with kind/path/op/input-type
+- Path accessor is compiled once and reused at runtime
+- Executor policy controls error strategy and side-effect allowance
+- Compile-time APIs: `ValidateSchema` and `CompilePipeline`
+
+## Breaking Changes
+
+- Old `x/formatter` and `x/transform` are removed.
+- Advanced transformations now live in `x/pipeline` only.
