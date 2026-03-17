@@ -154,6 +154,13 @@ func validateNode(node Node, reg *Registry) error {
 	}
 	switch n := node.(type) {
 	case FieldNode:
+		if scoped, _, sub := parseScopedPath(n.Path); scoped {
+			if sub == "" {
+				return nil
+			}
+			_, err := CompileAccessor(sub)
+			return err
+		}
 		_, err := CompileAccessor(n.Path)
 		return err
 	case ValueNode:
@@ -178,6 +185,25 @@ func validateNode(node Node, reg *Registry) error {
 			}
 		}
 		return nil
+	case ArrayMapNode:
+		if n.From == "" {
+			return &Error{Kind: ErrKindValidate, Op: "node", Message: "array map from is empty"}
+		}
+		if scoped, _, sub := parseScopedPath(n.From); scoped {
+			if sub != "" {
+				if _, err := CompileAccessor(sub); err != nil {
+					return err
+				}
+			}
+		} else {
+			if _, err := CompileAccessor(n.From); err != nil {
+				return err
+			}
+		}
+		if n.Item == nil {
+			return &Error{Kind: ErrKindValidate, Op: "node", Message: "array map item is nil"}
+		}
+		return validateNode(n.Item, reg)
 	case OpNode:
 		if n.Op.Name == "" || !reg.HasMapper(n.Op.Name) {
 			return &Error{Kind: ErrKindValidate, Op: "node", Path: n.Op.Name, Message: "unknown mapper in OpNode"}
@@ -191,6 +217,17 @@ func validateNode(node Node, reg *Registry) error {
 func compileNode(node Node) (compiledNode, error) {
 	switch n := node.(type) {
 	case FieldNode:
+		if scoped, scopeName, sub := parseScopedPath(n.Path); scoped {
+			var ac *Accessor
+			var err error
+			if sub != "" {
+				ac, err = CompileAccessor(sub)
+				if err != nil {
+					return nil, err
+				}
+			}
+			return compiledScopedFieldNode{scopeName: scopeName, path: ac}, nil
+		}
 		ac, err := CompileAccessor(n.Path)
 		if err != nil {
 			return nil, err
@@ -218,6 +255,16 @@ func compileNode(node Node) (compiledNode, error) {
 			out.items = append(out.items, cn)
 		}
 		return out, nil
+	case ArrayMapNode:
+		source, err := compileValueSource(n.From)
+		if err != nil {
+			return nil, err
+		}
+		item, err := compileNode(n.Item)
+		if err != nil {
+			return nil, err
+		}
+		return compiledArrayMapNode{source: source, item: item}, nil
 	case OpNode:
 		cn, err := compileNode(n.Input)
 		if err != nil {
@@ -227,4 +274,20 @@ func compileNode(node Node) (compiledNode, error) {
 	default:
 		return nil, &Error{Kind: ErrKindCompile, Op: "compile_node", Message: "unsupported node type"}
 	}
+}
+
+func parseScopedPath(path string) (bool, string, string) {
+	if path == "" || path[0] != '$' {
+		return false, "", ""
+	}
+	if path == "$item" || path == "$index" {
+		return true, path, ""
+	}
+	if len(path) > 6 && path[:6] == "$item." {
+		return true, "$item", path[6:]
+	}
+	if len(path) > 7 && path[:7] == "$index." {
+		return true, "$index", path[7:]
+	}
+	return false, "", ""
 }

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"reflect"
 	"strings"
 )
 
@@ -8,6 +9,7 @@ type State struct {
 	Input  any
 	Doc    map[string]any
 	Output any
+	Scope  map[string]any
 }
 
 type CompiledPipeline struct {
@@ -172,6 +174,25 @@ func (n compiledFieldNode) eval(_ *Context, st *State, _ *CompiledPipeline) (any
 	return n.path.Get(st.Doc)
 }
 
+type compiledScopedFieldNode struct {
+	scopeName string
+	path      *Accessor
+}
+
+func (n compiledScopedFieldNode) eval(_ *Context, st *State, _ *CompiledPipeline) (any, error) {
+	if st.Scope == nil {
+		return nil, nil
+	}
+	base, ok := st.Scope[n.scopeName]
+	if !ok {
+		return nil, nil
+	}
+	if n.path == nil {
+		return base, nil
+	}
+	return n.path.Get(base)
+}
+
 type compiledValueNode struct{ value any }
 
 func (n compiledValueNode) eval(_ *Context, _ *State, _ *CompiledPipeline) (any, error) {
@@ -206,6 +227,75 @@ func (n compiledArrayNode) eval(ctx *Context, st *State, c *CompiledPipeline) (a
 	return out, nil
 }
 
+type valueSource interface {
+	get(*State) (any, error)
+}
+
+type docValueSource struct{ path *Accessor }
+
+func (s docValueSource) get(st *State) (any, error) { return s.path.Get(st.Doc) }
+
+type scopedValueSource struct {
+	scopeName string
+	path      *Accessor
+}
+
+func (s scopedValueSource) get(st *State) (any, error) {
+	if st.Scope == nil {
+		return nil, nil
+	}
+	base, ok := st.Scope[s.scopeName]
+	if !ok {
+		return nil, nil
+	}
+	if s.path == nil {
+		return base, nil
+	}
+	return s.path.Get(base)
+}
+
+type compiledArrayMapNode struct {
+	source valueSource
+	item   compiledNode
+}
+
+func (n compiledArrayMapNode) eval(ctx *Context, st *State, c *CompiledPipeline) (any, error) {
+	src, err := n.source.get(st)
+	if err != nil {
+		return nil, err
+	}
+	items, ok := toSlice(src)
+	if !ok {
+		return []any{}, nil
+	}
+	out := make([]any, 0, len(items))
+	prevItem, hasPrevItem := st.Scope["$item"]
+	prevIndex, hasPrevIndex := st.Scope["$index"]
+	for i, item := range items {
+		if ctx.MaxIterations > 0 && i >= ctx.MaxIterations {
+			return nil, &Error{Kind: ErrKindRuntime, Op: "array_map", Message: "max iterations exceeded"}
+		}
+		st.Scope["$item"] = item
+		st.Scope["$index"] = i
+		v, err := n.item.eval(ctx, st, c)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	if hasPrevItem {
+		st.Scope["$item"] = prevItem
+	} else {
+		delete(st.Scope, "$item")
+	}
+	if hasPrevIndex {
+		st.Scope["$index"] = prevIndex
+	} else {
+		delete(st.Scope, "$index")
+	}
+	return out, nil
+}
+
 type compiledOpNode struct {
 	in compiledNode
 	op OpSpec
@@ -227,7 +317,7 @@ func (n compiledOpNode) eval(ctx *Context, st *State, c *CompiledPipeline) (any,
 }
 
 func (p *CompiledPipeline) Run(ctx Context, input any) (any, error) {
-	st := &State{Input: input, Doc: map[string]any{}, Output: nil}
+	st := &State{Input: input, Doc: map[string]any{}, Output: nil, Scope: map[string]any{}}
 	if len(p.steps) == 0 {
 		return nil, &Error{Kind: ErrKindRuntime, Op: "run", Message: "empty pipeline"}
 	}
@@ -240,6 +330,42 @@ func (p *CompiledPipeline) Run(ctx Context, input any) (any, error) {
 		return st.Output, nil
 	}
 	return st.Doc, nil
+}
+
+func compileValueSource(path string) (valueSource, error) {
+	if scoped, scopeName, sub := parseScopedPath(path); scoped {
+		if sub == "" {
+			return scopedValueSource{scopeName: scopeName}, nil
+		}
+		ac, err := CompileAccessor(sub)
+		if err != nil {
+			return nil, err
+		}
+		return scopedValueSource{scopeName: scopeName, path: ac}, nil
+	}
+	ac, err := CompileAccessor(path)
+	if err != nil {
+		return nil, err
+	}
+	return docValueSource{path: ac}, nil
+}
+
+func toSlice(v any) ([]any, bool) {
+	if v == nil {
+		return nil, false
+	}
+	if t, ok := v.([]any); ok {
+		return t, true
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return nil, false
+	}
+	out := make([]any, 0, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		out = append(out, rv.Index(i).Interface())
+	}
+	return out, true
 }
 
 func parseExpr(expr string) (string, string, error) {

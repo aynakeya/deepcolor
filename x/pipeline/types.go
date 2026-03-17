@@ -84,11 +84,12 @@ type OpSpec struct {
 type NodeKind string
 
 const (
-	NodeField  NodeKind = "field"
-	NodeValue  NodeKind = "value"
-	NodeObject NodeKind = "object"
-	NodeArray  NodeKind = "array"
-	NodeOp     NodeKind = "op"
+	NodeField    NodeKind = "field"
+	NodeValue    NodeKind = "value"
+	NodeObject   NodeKind = "object"
+	NodeArray    NodeKind = "array"
+	NodeArrayMap NodeKind = "array_map"
+	NodeOp       NodeKind = "op"
 )
 
 type Node interface {
@@ -118,6 +119,13 @@ type ArrayNode struct {
 }
 
 func (ArrayNode) nodeKind() NodeKind { return NodeArray }
+
+type ArrayMapNode struct {
+	From string
+	Item Node
+}
+
+func (ArrayMapNode) nodeKind() NodeKind { return NodeArrayMap }
 
 type OpNode struct {
 	Input Node

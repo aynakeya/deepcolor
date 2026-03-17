@@ -156,3 +156,77 @@ func TestRegistryIsolation(t *testing.T) {
 		t.Fatalf("reg2 should fail due to missing builtins")
 	}
 }
+
+func TestBuiltinSwitchFirst(t *testing.T) {
+	reg := NewRegistryWithBuiltins()
+	plan := Plan{
+		SchemaVersion: VersionV1,
+		Steps: []Step{
+			ExtractStep{Assignments: []ExtractAssignment{
+				{To: "title", Expr: "json:data.title"},
+			}},
+			MapStep{Transforms: []MapTransform{
+				{
+					Path: "title",
+					Ops: []OpSpec{
+						{
+							Name: "switch_first",
+							Args: []any{
+								OpSpec{Name: "cast_int"}, // should fail for non-number
+								OpSpec{Name: "lower"},    // should succeed
+							},
+						},
+					},
+				},
+			}},
+		},
+		Output: FieldNode{Path: "title"},
+	}
+	cp, err := CompilePipeline(plan, reg)
+	if err != nil {
+		t.Fatalf("compile failed: %v", err)
+	}
+	out, err := cp.Run(DefaultContext(), []byte(`{"data":{"title":"REOL"}}`))
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+	if out.(string) != "reol" {
+		t.Fatalf("unexpected switch_first output: %v", out)
+	}
+}
+
+func TestBuiltinSplitJoinDefault(t *testing.T) {
+	reg := NewRegistryWithBuiltins()
+	plan := Plan{
+		SchemaVersion: VersionV1,
+		Steps: []Step{
+			ExtractStep{Assignments: []ExtractAssignment{
+				{To: "tags", Expr: "json:data.tags"},
+				{To: "title", Expr: "json:data.title"},
+			}},
+			MapStep{Transforms: []MapTransform{
+				{Path: "tags", Ops: []OpSpec{{Name: "split", Args: []any{","}}, {Name: "join", Args: []any{"|"}}}},
+				{Path: "title", Ops: []OpSpec{{Name: "default", Args: []any{"unknown"}}}},
+			}},
+		},
+		Output: ObjectNode{Fields: map[string]Node{
+			"tags":  FieldNode{Path: "tags"},
+			"title": FieldNode{Path: "title"},
+		}},
+	}
+	cp, err := CompilePipeline(plan, reg)
+	if err != nil {
+		t.Fatalf("compile failed: %v", err)
+	}
+	out, err := cp.Run(DefaultContext(), []byte(`{"data":{"tags":"a,b,c","title":""}}`))
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+	m := out.(map[string]any)
+	if m["tags"] != "a|b|c" {
+		t.Fatalf("unexpected tags output: %v", m["tags"])
+	}
+	if m["title"] != "unknown" {
+		t.Fatalf("unexpected title output: %v", m["title"])
+	}
+}

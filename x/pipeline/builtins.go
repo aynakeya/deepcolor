@@ -96,6 +96,87 @@ func registerBuiltins(r *Registry) {
 		}
 		return re.ReplaceAllString(cast.ToString(in), cast.ToString(args[1])), nil
 	})
+	r.RegisterMapper("regex_find", EffectPure, func(_ *Context, in any, args []any) (any, error) {
+		if len(args) == 0 {
+			return nil, &Error{Kind: ErrKindRuntime, Op: "regex_find", Message: "need pattern"}
+		}
+		group := 0
+		if len(args) > 1 {
+			group = cast.ToInt(args[1])
+		}
+		re, err := regexp.Compile(cast.ToString(args[0]))
+		if err != nil {
+			return nil, err
+		}
+		m := re.FindStringSubmatch(cast.ToString(in))
+		if len(m) <= group {
+			return nil, nil
+		}
+		return m[group], nil
+	})
+	r.RegisterMapper("default", EffectPure, func(_ *Context, in any, args []any) (any, error) {
+		if len(args) == 0 {
+			return in, nil
+		}
+		if in == nil || cast.ToString(in) == "" {
+			return args[0], nil
+		}
+		return in, nil
+	})
+	r.RegisterMapper("split", EffectPure, func(_ *Context, in any, args []any) (any, error) {
+		sep := ","
+		if len(args) > 0 {
+			sep = cast.ToString(args[0])
+		}
+		parts := strings.Split(cast.ToString(in), sep)
+		out := make([]any, 0, len(parts))
+		for _, p := range parts {
+			out = append(out, p)
+		}
+		return out, nil
+	})
+	r.RegisterMapper("join", EffectPure, func(_ *Context, in any, args []any) (any, error) {
+		sep := ","
+		if len(args) > 0 {
+			sep = cast.ToString(args[0])
+		}
+		arr, ok := in.([]any)
+		if !ok {
+			return nil, &Error{Kind: ErrKindRuntime, Op: "join", Message: "join expects []any"}
+		}
+		parts := make([]string, 0, len(arr))
+		for _, item := range arr {
+			parts = append(parts, cast.ToString(item))
+		}
+		return strings.Join(parts, sep), nil
+	})
+	r.RegisterMapper("switch_first", EffectPure, func(ctx *Context, in any, args []any) (any, error) {
+		var lastErr error
+		for _, candidate := range args {
+			op, err := parseOpCandidate(candidate)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			entry, err := r.getMapper(op.Name)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			out, err := entry.fn(ctx, in, op.Args)
+			if err == nil {
+				if out != nil {
+					return out, nil
+				}
+			} else {
+				lastErr = err
+			}
+		}
+		if lastErr != nil {
+			return nil, lastErr
+		}
+		return in, nil
+	})
 
 	r.RegisterPredicate("exists", EffectPure, func(_ *Context, in any, _ []any) (bool, error) { return in != nil, nil })
 	r.RegisterPredicate("eq", EffectPure, func(_ *Context, in any, args []any) (bool, error) {
@@ -122,4 +203,35 @@ func registerBuiltins(r *Registry) {
 		}
 		return cast.ToFloat64(in) < cast.ToFloat64(args[0]), nil
 	})
+}
+
+func parseOpCandidate(v any) (OpSpec, error) {
+	switch t := v.(type) {
+	case OpSpec:
+		if t.Name == "" {
+			return OpSpec{}, &Error{Kind: ErrKindRuntime, Op: "switch_first", Message: "candidate op name is empty"}
+		}
+		return t, nil
+	case map[string]any:
+		name := cast.ToString(t["name"])
+		if name == "" {
+			return OpSpec{}, &Error{Kind: ErrKindRuntime, Op: "switch_first", Message: "candidate map.name is empty"}
+		}
+		rawArgs, ok := t["args"]
+		if !ok {
+			return OpSpec{Name: name}, nil
+		}
+		args, ok := rawArgs.([]any)
+		if !ok {
+			return OpSpec{}, &Error{Kind: ErrKindRuntime, Op: "switch_first", Message: "candidate map.args must be []any"}
+		}
+		return OpSpec{Name: name, Args: args}, nil
+	case string:
+		if t == "" {
+			return OpSpec{}, &Error{Kind: ErrKindRuntime, Op: "switch_first", Message: "candidate string is empty"}
+		}
+		return OpSpec{Name: t}, nil
+	default:
+		return OpSpec{}, &Error{Kind: ErrKindRuntime, Op: "switch_first", Message: "unsupported candidate type"}
+	}
 }
