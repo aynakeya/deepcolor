@@ -2,7 +2,7 @@ package filters
 
 import (
 	"encoding/json"
-	"github.com/aynakeya/deepcolor/transform"
+	"github.com/aynakeya/deepcolor/x/transform"
 	"github.com/stretchr/testify/assert"
 	"reflect"
 	"regexp"

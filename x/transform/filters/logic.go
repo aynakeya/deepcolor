@@ -1,6 +1,6 @@
 package filters
 
-import "github.com/aynakeya/deepcolor/transform"
+import "github.com/aynakeya/deepcolor/x/transform"
 
 type OrFilter struct {
 	transform.BaseFilter

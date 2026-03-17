@@ -1,6 +1,6 @@
 package translators
 
-import "github.com/aynakeya/deepcolor/transform"
+import "github.com/aynakeya/deepcolor/x/transform"
 
 type FilterTranslator struct {
 	transform.BaseTranslator

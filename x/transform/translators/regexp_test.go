@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/aynakeya/deepcolor/transform"
+	"github.com/aynakeya/deepcolor/x/transform"
 	"gotest.tools/assert"
 	"regexp"
 	"testing"

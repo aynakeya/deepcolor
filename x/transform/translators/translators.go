@@ -1,7 +1,7 @@
 package translators
 
 import (
-	"github.com/aynakeya/deepcolor/transform"
+	"github.com/aynakeya/deepcolor/x/transform"
 )
 
 func init() {

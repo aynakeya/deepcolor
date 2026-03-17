@@ -3,7 +3,7 @@ package translators
 import (
 	"errors"
 	"fmt"
-	"github.com/aynakeya/deepcolor/transform"
+	"github.com/aynakeya/deepcolor/x/transform"
 	"github.com/spf13/cast"
 )
 

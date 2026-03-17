@@ -2,7 +2,7 @@ package translators
 
 import (
 	"fmt"
-	"github.com/aynakeya/deepcolor/transform"
+	"github.com/aynakeya/deepcolor/x/transform"
 	"strings"
 )
 

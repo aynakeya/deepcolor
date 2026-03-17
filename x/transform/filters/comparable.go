@@ -1,7 +1,7 @@
 package filters
 
 import (
-	"github.com/aynakeya/deepcolor/transform"
+	"github.com/aynakeya/deepcolor/x/transform"
 )
 
 //type ComparableOperator string

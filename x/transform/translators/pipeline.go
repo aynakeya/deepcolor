@@ -3,7 +3,7 @@ package translators
 import (
 	"encoding/json"
 	"errors"
-	"github.com/aynakeya/deepcolor/transform"
+	"github.com/aynakeya/deepcolor/x/transform"
 )
 
 type Pipeline struct {

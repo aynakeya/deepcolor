@@ -89,3 +89,6 @@ _ = err
 
 - v2 is a breaking redesign and does not preserve v1 root-level APIs.
 - Internal transport/runtime code is moved under `internal/` and is not public API.
+- Advanced processing modules are moved under `x/`:
+  - `github.com/aynakeya/deepcolor/x/formatter`
+  - `github.com/aynakeya/deepcolor/x/transform`
