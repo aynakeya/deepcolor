@@ -15,6 +15,10 @@ This rewrite is based on `chardetng` commit:
 - `(*Detector).Feed(chunk []byte, last bool) bool`
 - `(*Detector).Guess(tld []byte, allowUTF8 bool) Encoding`
 - `(*Detector).GuessAssess(tld []byte, allowUTF8 bool) GuessResult`
+- `Detect(data []byte, tld []byte, allowUTF8 bool) Encoding`
+- `DetectAssess(data []byte, tld []byte, allowUTF8 bool) GuessResult`
+- `DetectNoTLD(data []byte, allowUTF8 bool) Encoding`
+- `DetectAssessNoTLD(data []byte, allowUTF8 bool) GuessResult`
 - `TLDMayAffectGuess(tld []byte) bool`
 
 `tld` is expected to be the right-most DNS label in lower-case ASCII (e.g. `"jp"`, `"com"`, or punycode like `"xn--..."`).

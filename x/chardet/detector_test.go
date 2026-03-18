@@ -1,6 +1,7 @@
 package chardet
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -181,4 +182,32 @@ func TestCJKSpecialCases(t *testing.T) {
 		d.Feed(b, true)
 		require.Equal(t, EncodingBig5, d.Guess([]byte("tw"), false))
 	})
+}
+
+func TestDetectAPI(t *testing.T) {
+	data := encode(t, simplifiedchinese.GBK, "这是一个字符编码测试。")
+	require.Equal(t, EncodingGBK, Detect(data, []byte("cn"), false))
+	r := DetectAssess(data, []byte("cn"), false)
+	require.Equal(t, EncodingGBK, r.Encoding)
+}
+
+func TestDetectAPIConcurrent(t *testing.T) {
+	data := encode(t, simplifiedchinese.GB18030, "数据库名：c播拨龾龿珳珴𬀩𬀪")
+	const n = 128
+	var wg sync.WaitGroup
+	wg.Add(n)
+	errCh := make(chan string, n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			if got := Detect(data, []byte("cn"), false); got != EncodingGB18030 {
+				errCh <- string(got)
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for got := range errCh {
+		require.Fail(t, "unexpected concurrent detect result", got)
+	}
 }
