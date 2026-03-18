@@ -1,0 +1,14 @@
+# Generated datasets and reports
+dataset.tsv
+rust_out.tsv
+last_report.txt
+history_report.log
+
+# Temporary outputs
+*.tmp
+*.log.tmp
+*.out
+
+# Rust helper build artifacts
+tools/rust_detect_tsv/target/
+tools/rust_detect_tsv/Cargo.lock

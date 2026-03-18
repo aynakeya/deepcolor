@@ -1,0 +1,7 @@
+[package]
+name = "detect_tsv"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chardetng = "0.1.17"
