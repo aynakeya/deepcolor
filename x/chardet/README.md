@@ -7,6 +7,7 @@
 This rewrite is based on `chardetng` commit:
 
 - `3b893dbbd06098ce84144575fbd70dea73a576eb`
+- with patch `47e68d9c65ea4f3063ee3dd8f5f4f912f3bb7076` (`xhorak/chardetng`: Add support to GB18030 encoding detection)
 
 ## API
 

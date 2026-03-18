@@ -19,7 +19,7 @@ func scoreCJKFrequency(b []byte, enc Encoding) float64 {
 		_, inK := frequentKanjiSet[r]
 		_, inH := frequentHangulSet[r]
 		switch enc {
-		case EncodingGBK:
+		case EncodingGBK, EncodingGB18030:
 			if inS {
 				score += 0.7
 			}

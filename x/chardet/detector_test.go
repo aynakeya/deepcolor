@@ -58,6 +58,12 @@ func TestGBK(t *testing.T) {
 	require.Contains(t, []Encoding{EncodingGBK, EncodingBig5, EncodingShiftJIS}, d.Guess([]byte("cn"), false))
 }
 
+func TestGB18030(t *testing.T) {
+	d := NewDetector()
+	d.Feed(encode(t, simplifiedchinese.GB18030, "数据库名：c播拨龾龿珳珴𬀩𬀪"), true)
+	require.Equal(t, EncodingGB18030, d.Guess([]byte("cn"), false))
+}
+
 func TestBig5(t *testing.T) {
 	d := NewDetector()
 	d.Feed(encode(t, traditionalchinese.Big5, "這是一個字符編碼測試。"), true)

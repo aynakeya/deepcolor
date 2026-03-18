@@ -241,6 +241,7 @@ func defs() []sampleDef {
 		{Encoding: "euc-jp", TLD: "jp", AllowUTF8: false, Texts: []string{"これは文字実験です。", "日本語のテキストです。"}},
 		{Encoding: "euc-kr", TLD: "kr", AllowUTF8: false, Texts: []string{"이것은 문자 인코딩 테스트입니다.", "한글 데이터 분석"}},
 		{Encoding: "gbk", TLD: "cn", AllowUTF8: false, Texts: []string{"这是一个字符编码测试。", "中文内容用于检测。"}},
+		{Encoding: "gb18030", TLD: "cn", AllowUTF8: false, Texts: []string{"数据库名：c播拨龾龿珳珴𬀩𬀪", "扩展字符：𠀀𠀁𠀂"}},
 		{Encoding: "big5", TLD: "tw", AllowUTF8: false, Texts: []string{"這是一個字符編碼測試。", "繁體中文資料檢測"}},
 		{Encoding: "windows-1251", TLD: "ru", AllowUTF8: false, Texts: []string{"Это тест кодировки символов.", "Русский текст для проверки."}},
 		{Encoding: "koi8-u", TLD: "ru", AllowUTF8: false, Texts: []string{"Це тест на кодування символів."}},
@@ -276,6 +277,8 @@ func getEncoding(name string) encoding.Encoding {
 		return korean.EUCKR
 	case "gbk":
 		return simplifiedchinese.GBK
+	case "gb18030":
+		return simplifiedchinese.GB18030
 	case "big5":
 		return traditionalchinese.Big5
 	case "windows-1252":
@@ -382,6 +385,9 @@ func readRustOut(path string) (map[string]string, error) {
 func normalize(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	s = strings.ReplaceAll(s, "_", "-")
+	if s == "gb-18030" {
+		return "gb18030"
+	}
 	if s == "x-user-defined" {
 		return "windows-1252"
 	}
@@ -394,7 +400,7 @@ func normalizeSaintfish(s string) string {
 	case "windows-31j", "cp932":
 		return "shift-jis"
 	case "gb-18030", "gb18030":
-		return "gbk"
+		return "gb18030"
 	case "ibm-866", "cp866":
 		return "ibm866"
 	case "iso-8859-8-i":
@@ -407,7 +413,7 @@ func family(enc string) string {
 	switch enc {
 	case "shift-jis", "euc-jp", "iso-2022-jp":
 		return "jp"
-	case "gbk", "big5":
+	case "gbk", "gb18030", "big5":
 		return "zh"
 	case "euc-kr":
 		return "kr"

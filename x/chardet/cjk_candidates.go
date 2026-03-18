@@ -9,6 +9,8 @@ const (
 	shiftJisPUAPenalty       = -(cjkBaseScore * 10)
 	shiftJisExtensionPenalty = shiftJisPUAPenalty * 2
 	gbkPUAPenalty            = -(cjkBaseScore * 10)
+	gb18030PUAPenalty        = gbkPUAPenalty
+	gb18030FourByteBonus     = cjkBaseScore * 3
 	big5PUAPenalty           = -(cjkBaseScore * 30)
 )
 
@@ -31,6 +33,8 @@ func scoreCJKCandidate(buf []byte, enc Encoding) float64 {
 		score += scoreEUCKRCandidate(buf)
 	case EncodingGBK:
 		score += scoreGBKCandidate(buf)
+	case EncodingGB18030:
+		score += scoreGB18030Candidate(buf)
 	case EncodingBig5:
 		score += scoreBig5Candidate(buf)
 	}
@@ -390,6 +394,108 @@ func scoreGBKCandidate(buf []byte) float64 {
 		i++
 	}
 	score += scoreCJKFrequency(bytesMustDecode(buf, EncodingGBK), EncodingGBK)
+	if cjCount < 2 {
+		score -= 220
+	}
+	score -= float64(badCount * 10)
+	return score
+}
+
+func scoreGB18030Candidate(buf []byte) float64 {
+	score := 0.0
+	state := latinCJKOther
+	cjCount := 0
+	badCount := 0
+	prevByte := byte(0)
+	pending := 0.0
+	hasPending := false
+	maybePending := func(s float64) float64 {
+		if state == latinCJKCJ || !moreProblematicLead(prevByte) {
+			return s
+		}
+		pending = s
+		hasPending = true
+		return 0
+	}
+	flushPending := func() {
+		if hasPending {
+			score += pending
+			hasPending = false
+			pending = 0
+		}
+	}
+	for i := 0; i < len(buf); {
+		b := buf[i]
+		if isASCIILetter(b) {
+			hasPending = false
+			if state == latinCJKCJ {
+				score += cjkLatinAdjacencyPenalty
+			}
+			state = latinCJKAscii
+			prevByte = b
+			i++
+			continue
+		}
+		if b < 0x80 {
+			hasPending = false
+			state = latinCJKOther
+			prevByte = b
+			i++
+			continue
+		}
+		// GB18030-specific 4-byte sequence: 81-FE 30-39 81-FE 30-39
+		if b >= 0x81 && b <= 0xFE && i+3 < len(buf) {
+			b2, b3, b4 := buf[i+1], buf[i+2], buf[i+3]
+			if b2 >= 0x30 && b2 <= 0x39 && b3 >= 0x81 && b3 <= 0xFE && b4 >= 0x30 && b4 <= 0x39 {
+				flushPending()
+				score += maybePending(gb18030FourByteBonus)
+				cjCount++
+				if state == latinCJKAscii {
+					score += cjkLatinAdjacencyPenalty
+				}
+				state = latinCJKCJ
+				prevByte = b4
+				i += 4
+				continue
+			}
+		}
+		// Shared GBK 2-byte sequence.
+		if b >= 0x81 && b <= 0xFE && i+1 < len(buf) {
+			t := buf[i+1]
+			if t >= 0x40 && t <= 0xFE && t != 0x7F {
+				flushPending()
+				if b >= 0xA1 && b <= 0xD7 {
+					score += maybePending(cjkBaseScore)
+				} else if b >= 0xD8 {
+					score += maybePending(cjkSecondaryBaseScore)
+				} else {
+					score += maybePending(cjkOtherScore)
+				}
+				cjCount++
+				if state == latinCJKAscii {
+					score += cjkLatinAdjacencyPenalty
+				}
+				state = latinCJKCJ
+				prevByte = t
+				i += 2
+				continue
+			}
+		}
+		if ((prevByte == 0xA0 || prevByte == 0xFE || prevByte == 0xFD) && (b < 0x80 || b == 0xFF)) || b == 0xFF {
+			flushPending()
+			score += shiftJisExtensionPenalty
+		}
+		if b == 0xA0 || b == 0xFE || b == 0xFD || b == 0xFF {
+			score += gb18030PUAPenalty
+		} else {
+			score -= float64(cjkBaseScore * 10)
+		}
+		badCount++
+		state = latinCJKOther
+		prevByte = b
+		i++
+	}
+	score += scoreCJKFrequency(bytesMustDecode(buf, EncodingGB18030), EncodingGB18030)
 	if cjCount < 2 {
 		score -= 220
 	}

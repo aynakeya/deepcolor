@@ -12,6 +12,7 @@ const (
 	EncodingEUCJP     Encoding = "euc-jp"
 	EncodingEUCKR     Encoding = "euc-kr"
 	EncodingGBK       Encoding = "gbk"
+	EncodingGB18030   Encoding = "gb18030"
 	EncodingBig5      Encoding = "big5"
 
 	EncodingWindows1252 Encoding = "windows-1252"
@@ -50,6 +51,8 @@ func normalizeEncodingLabel(s string) Encoding {
 		return EncodingEUCJP
 	case "euckr", "ksc5601":
 		return EncodingEUCKR
+	case "gb18030", "gb-18030":
+		return EncodingGB18030
 	case "windows1252", "cp1252":
 		return EncodingWindows1252
 	case "windows1251", "cp1251":

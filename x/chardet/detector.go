@@ -49,6 +49,7 @@ const (
 	encIBM866
 	encISO88595
 	encGBK
+	encGB18030
 	encBig5
 	encEUCKR
 	encEUCJP
@@ -81,6 +82,7 @@ var encByIndex = [encCount]Encoding{
 	encIBM866:      EncodingIBM866,
 	encISO88595:    EncodingISO88595,
 	encGBK:         EncodingGBK,
+	encGB18030:     EncodingGB18030,
 	encBig5:        EncodingBig5,
 	encEUCKR:       EncodingEUCKR,
 	encEUCJP:       EncodingEUCJP,
@@ -95,7 +97,7 @@ var rankingIndexOrder = [...]int{
 	encWindows1253, encISO88597, encWindows1254, encWindows1258,
 	encWindows1257, encISO885913, encISO88594, encWindows874,
 	encKOI8U, encIBM866, encISO88595,
-	encGBK, encBig5, encEUCKR, encEUCJP, encShiftJIS,
+	encGBK, encGB18030, encBig5, encEUCKR, encEUCJP, encShiftJIS,
 	encISO2022JP, encUTF8,
 }
 
@@ -228,6 +230,8 @@ func encodingImpl(enc Encoding) encoding.Encoding {
 		return korean.EUCKR
 	case EncodingGBK:
 		return simplifiedchinese.GBK
+	case EncodingGB18030:
+		return simplifiedchinese.GB18030
 	case EncodingBig5:
 		return traditionalchinese.Big5
 	case EncodingWindows1252:
@@ -284,6 +288,7 @@ func scoreAll(buf []byte) scoreArray {
 	s[encEUCJP] = scoreDecoded(buf, EncodingEUCJP)
 	s[encEUCKR] = scoreDecoded(buf, EncodingEUCKR)
 	s[encGBK] = scoreDecoded(buf, EncodingGBK)
+	s[encGB18030] = scoreDecoded(buf, EncodingGB18030)
 	s[encBig5] = scoreDecoded(buf, EncodingBig5)
 	s[encWindows1252] = scoreDecoded(buf, EncodingWindows1252)
 	s[encWindows1251] = scoreDecoded(buf, EncodingWindows1251)
@@ -415,7 +420,7 @@ func scoreDecoded(buf []byte, enc Encoding) float64 {
 	if impl == nil {
 		return -1e9
 	}
-	if enc == EncodingShiftJIS || enc == EncodingEUCJP || enc == EncodingEUCKR || enc == EncodingGBK || enc == EncodingBig5 {
+	if enc == EncodingShiftJIS || enc == EncodingEUCJP || enc == EncodingEUCKR || enc == EncodingGBK || enc == EncodingGB18030 || enc == EncodingBig5 {
 		return scoreCJKCandidate(buf, enc)
 	}
 	if idx, ok := singleByteIndexForEncoding(enc); ok {
@@ -514,7 +519,7 @@ func scoreDecoded(buf []byte, enc Encoding) float64 {
 		score += scoreKanaFromBytes(buf)
 	}
 	score += scoreMultibyteStructure(buf, enc)
-	if enc == EncodingBig5 || enc == EncodingGBK {
+	if enc == EncodingBig5 || enc == EncodingGBK || enc == EncodingGB18030 {
 		score += scoreCJKFrequency(decoded, enc)
 	}
 	if isSingleByteEncoding(enc) {
@@ -881,6 +886,7 @@ func applyTLDBias(scores *scoreArray, class tldClass) {
 		boost(encBig5, 140)
 	case tldSimplified:
 		boost(encGBK, 140)
+		boost(encGB18030, 130)
 	case tldCyrillic, tldWesternCyrillic, tldCentralCyrillic:
 		boost(encWindows1251, 90)
 		boost(encKOI8U, 40)
